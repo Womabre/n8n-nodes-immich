@@ -1,4 +1,7 @@
 import { INodeProperties } from 'n8n-workflow';
+import { returnAllAndLimit } from '../parameters/shared-parameters';
+import { dateTimeExpr, idListExpr, optionalExpr } from '../utils/expressions';
+import { paginateByPage } from '../utils/pagination';
 
 const sharedSearchFilterOptions: INodeProperties['options'] = [
 	{ displayName: 'Album IDs', name: 'albumIds', type: 'string', default: '', description: 'Comma-separated album IDs' },
@@ -25,34 +28,22 @@ const sharedSearchFilterOptions: INodeProperties['options'] = [
 	{ displayName: 'Model', name: 'model', type: 'string', default: '' },
 	{ displayName: 'Taken After', name: 'takenAfter', type: 'dateTime', default: '' },
 	{ displayName: 'Taken Before', name: 'takenBefore', type: 'dateTime', default: '' },
-	{ displayName: 'Page', name: 'page', type: 'number', default: 1 },
-	{ displayName: 'Size', name: 'size', type: 'number', default: 100, description: 'Number of results to return' },
 	{ displayName: 'Include EXIF', name: 'withExif', type: 'boolean', default: false },
 ];
 
-function filterExpr(field: string): string {
-	return `={{$parameter["filters"]["${field}"] === undefined || $parameter["filters"]["${field}"] === '' ? undefined : $parameter["filters"]["${field}"]}}`;
-}
-
-function commaListExpr(field: string): string {
-	return `={{$parameter["filters"]["${field}"] ? $parameter["filters"]["${field}"].split(",").map(v => v.trim()) : undefined}}`;
-}
-
 const sharedSearchBody = {
-	albumIds: commaListExpr('albumIds'),
-	personIds: commaListExpr('personIds'),
-	tagIds: commaListExpr('tagIds'),
+	albumIds: idListExpr('filters.albumIds'),
+	personIds: idListExpr('filters.personIds'),
+	tagIds: idListExpr('filters.tagIds'),
 	isFavorite: '={{$parameter["filters"]["isFavorite"]}}',
 	isNotInAlbum: '={{$parameter["filters"]["isNotInAlbum"]}}',
-	type: filterExpr('type'),
-	city: filterExpr('city'),
-	country: filterExpr('country'),
-	make: filterExpr('make'),
-	model: filterExpr('model'),
-	takenAfter: filterExpr('takenAfter'),
-	takenBefore: filterExpr('takenBefore'),
-	page: '={{$parameter["filters"]["page"]}}',
-	size: '={{$parameter["filters"]["size"]}}',
+	type: optionalExpr('filters.type'),
+	city: optionalExpr('filters.city'),
+	country: optionalExpr('filters.country'),
+	make: optionalExpr('filters.make'),
+	model: optionalExpr('filters.model'),
+	takenAfter: dateTimeExpr('filters.takenAfter'),
+	takenBefore: dateTimeExpr('filters.takenBefore'),
 	withExif: '={{$parameter["filters"]["withExif"]}}',
 };
 
@@ -79,6 +70,9 @@ export const operations: INodeProperties[] = [
 						url: '/search/metadata',
 						body: sharedSearchBody,
 					},
+					operations: {
+						pagination: paginateByPage('body'),
+					},
 					output: {
 						postReceive: [
 							{
@@ -104,6 +98,9 @@ export const operations: INodeProperties[] = [
 							query: '={{$parameter["query"]}}',
 							...sharedSearchBody,
 						},
+					},
+					operations: {
+						pagination: paginateByPage('body'),
 					},
 					output: {
 						postReceive: [
@@ -148,6 +145,7 @@ export const operations: INodeProperties[] = [
 	},
 
 	// Search Metadata + Smart shared filters
+	...returnAllAndLimit('search', ['searchMetadata', 'searchSmart'], 'body'),
 	{
 		displayName: 'Filters',
 		name: 'filters',

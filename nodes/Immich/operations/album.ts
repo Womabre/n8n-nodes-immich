@@ -1,5 +1,7 @@
 import { INodeProperties } from 'n8n-workflow';
 import { resourceLocatorModes } from '../parameters/shared-parameters';
+import { assertBulkSuccess } from '../utils/bulk';
+import { clearableExpr, idListExpr, optionalExpr } from '../utils/expressions';
 
 export const operations: INodeProperties[] = [
 	{
@@ -22,8 +24,11 @@ export const operations: INodeProperties[] = [
 						method: 'PUT',
 						url: '=/albums/{{$parameter["albumId"]}}/assets',
 						body: {
-							ids: '={{$parameter["assetIds"].split(",").map(id => id.trim())}}',
+							ids: idListExpr('assetIds'),
 						},
+					},
+					output: {
+						postReceive: [assertBulkSuccess],
 					},
 				},
 			},
@@ -52,9 +57,8 @@ export const operations: INodeProperties[] = [
 						url: '/albums',
 						body: {
 							albumName: '={{$parameter["albumName"]}}',
-							description: '={{$parameter["additionalFields"]["description"] || undefined}}',
-							assetIds:
-								'={{$parameter["additionalFields"]["assetIds"] ? $parameter["additionalFields"]["assetIds"].split(",").map(id => id.trim()) : undefined}}',
+							description: optionalExpr('additionalFields.description'),
+							assetIds: idListExpr('additionalFields.assetIds'),
 						},
 					},
 				},
@@ -92,8 +96,10 @@ export const operations: INodeProperties[] = [
 						method: 'GET',
 						url: '/albums',
 						qs: {
-							shared: '={{$parameter["filters"]["shared"]}}',
-							assetId: '={{$parameter["filters"]["assetId"] || undefined}}',
+							isShared: '={{$parameter["filters"]["isShared"]}}',
+							isOwned: '={{$parameter["filters"]["isOwned"]}}',
+							name: optionalExpr('filters.name'),
+							assetId: optionalExpr('filters.assetId'),
 						},
 					},
 				},
@@ -107,8 +113,11 @@ export const operations: INodeProperties[] = [
 						method: 'DELETE',
 						url: '=/albums/{{$parameter["albumId"]}}/assets',
 						body: {
-							ids: '={{$parameter["assetIds"].split(",").map(id => id.trim())}}',
+							ids: idListExpr('assetIds'),
 						},
+					},
+					output: {
+						postReceive: [assertBulkSuccess],
 					},
 				},
 			},
@@ -134,7 +143,7 @@ export const operations: INodeProperties[] = [
 						url: '=/albums/{{$parameter["albumId"]}}',
 						body: {
 							albumName: '={{$parameter["updateFields"]["albumName"] || undefined}}',
-							description: '={{$parameter["updateFields"]["description"] || undefined}}',
+							description: clearableExpr('updateFields.description'),
 							albumThumbnailAssetId: '={{$parameter["updateFields"]["albumThumbnailAssetId"] || undefined}}',
 							isActivityEnabled: '={{$parameter["updateFields"]["isActivityEnabled"]}}',
 							order: '={{$parameter["updateFields"]["order"] || undefined}}',
@@ -223,13 +232,33 @@ export const operations: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['album'], operation: ['getAll'] } },
 		options: [
-			{ displayName: 'Shared Only', name: 'shared', type: 'boolean', default: false },
 			{
 				displayName: 'Asset ID',
 				name: 'assetId',
 				type: 'string',
 				default: '',
-				description: 'Only return albums containing this asset',
+				description: 'Only return albums containing this asset (Immich then ignores the other filters)',
+			},
+			{
+				displayName: 'Is Owned',
+				name: 'isOwned',
+				type: 'boolean',
+				default: true,
+				description: 'Whether to return only albums you own (true) or only albums shared with you (false)',
+			},
+			{
+				displayName: 'Is Shared',
+				name: 'isShared',
+				type: 'boolean',
+				default: true,
+				description: 'Whether to return only shared albums (true) or only unshared albums (false)',
+			},
+			{
+				displayName: 'Name',
+				name: 'name',
+				type: 'string',
+				default: '',
+				description: 'Only return albums with exactly this name',
 			},
 		],
 	},
@@ -255,7 +284,13 @@ export const operations: INodeProperties[] = [
 				],
 				default: 'desc',
 			},
-			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
+			{
+				displayName: 'Description',
+				name: 'description',
+				type: 'string',
+				default: '',
+				description: 'Leave empty to remove the description',
+			},
 			{ displayName: 'Enable Activity Feed', name: 'isActivityEnabled', type: 'boolean', default: true },
 		],
 	},

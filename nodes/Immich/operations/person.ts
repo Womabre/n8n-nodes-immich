@@ -1,5 +1,8 @@
 import { INodeProperties } from 'n8n-workflow';
-import { resourceLocatorModes } from '../parameters/shared-parameters';
+import { resourceLocatorModes, returnAllAndLimit } from '../parameters/shared-parameters';
+import { assertBulkSuccess } from '../utils/bulk';
+import { dateExpr, idListExpr, optionalExpr } from '../utils/expressions';
+import { paginateByPage } from '../utils/pagination';
 
 export const operations: INodeProperties[] = [
 	{
@@ -23,10 +26,11 @@ export const operations: INodeProperties[] = [
 						method: 'GET',
 						url: '/people',
 						qs: {
-							page: '={{$parameter["filters"]["page"]}}',
-							size: '={{$parameter["filters"]["size"]}}',
 							withHidden: '={{$parameter["filters"]["withHidden"]}}',
 						},
+					},
+					operations: {
+						pagination: paginateByPage('qs'),
 					},
 					output: {
 						postReceive: [
@@ -61,10 +65,10 @@ export const operations: INodeProperties[] = [
 						method: 'PUT',
 						url: '=/people/{{$parameter["personId"]}}',
 						body: {
-							name: '={{$parameter["updateFields"]["name"] || undefined}}',
+							name: optionalExpr('updateFields.name'),
 							isFavorite: '={{$parameter["updateFields"]["isFavorite"]}}',
 							isHidden: '={{$parameter["updateFields"]["isHidden"]}}',
-							birthDate: '={{$parameter["updateFields"]["birthDate"] || undefined}}',
+							birthDate: dateExpr('updateFields.birthDate'),
 						},
 					},
 				},
@@ -79,8 +83,11 @@ export const operations: INodeProperties[] = [
 						method: 'POST',
 						url: '=/people/{{$parameter["personId"]}}/merge',
 						body: {
-							ids: '={{$parameter["mergeIds"].split(",").map(id => id.trim())}}',
+							ids: idListExpr('mergeIds'),
 						},
+					},
+					output: {
+						postReceive: [assertBulkSuccess],
 					},
 				},
 			},
@@ -88,6 +95,7 @@ export const operations: INodeProperties[] = [
 		default: 'getAll',
 	},
 
+	...returnAllAndLimit('person', ['getAll'], 'query'),
 	{
 		displayName: 'Filters',
 		name: 'filters',
@@ -96,8 +104,6 @@ export const operations: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['person'], operation: ['getAll'] } },
 		options: [
-			{ displayName: 'Page', name: 'page', type: 'number', default: 1 },
-			{ displayName: 'Size', name: 'size', type: 'number', default: 500 },
 			{ displayName: 'Include Hidden', name: 'withHidden', type: 'boolean', default: false },
 		],
 	},
@@ -124,7 +130,13 @@ export const operations: INodeProperties[] = [
 			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
 			{ displayName: 'Is Favorite', name: 'isFavorite', type: 'boolean', default: false },
 			{ displayName: 'Is Hidden', name: 'isHidden', type: 'boolean', default: false },
-			{ displayName: 'Birth Date', name: 'birthDate', type: 'dateTime', default: '' },
+			{
+				displayName: 'Birth Date',
+				name: 'birthDate',
+				type: 'dateTime',
+				default: '',
+				description: 'Only the date is used. Leave empty to remove the birth date.',
+			},
 		],
 	},
 

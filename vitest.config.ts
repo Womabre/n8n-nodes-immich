@@ -7,7 +7,10 @@ export default defineConfig({
 		include: ['**/__tests__/**/*.test.ts'],
 		coverage: {
 			provider: 'v8',
-			reporter: ['text', 'lcov'],
+			// 'lcovonly' instead of 'lcov': the HTML report adds JavaScript files that
+			// `n8n-node lint` would pick up, and strict mode forbids ignoring them in
+			// eslint.config.mjs.
+			reporter: ['text', 'lcovonly'],
 		},
 	},
 });

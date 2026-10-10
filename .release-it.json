@@ -1,0 +1,20 @@
+{
+	"git": {
+		"requireBranch": "main",
+		"requireCleanWorkingDir": true,
+		"requireUpstream": true,
+		"requireCommits": true,
+		"commit": true,
+		"tag": true,
+		"push": true
+	},
+	"github": {
+		"release": true
+	},
+	"npm": {
+		"publish": false
+	},
+	"hooks": {
+		"before:init": "bun run lint && bun run build"
+	}
+}

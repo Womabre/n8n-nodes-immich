@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-immich",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"publisher": "Womabre",
 	"description": "n8n community node for interacting with the Immich self-hosted photo and video management API",
 	"license": "MIT",
@@ -24,7 +24,6 @@
 	"engines": {
 		"node": ">=20.15"
 	},
-	"main": "index.js",
 	"scripts": {
 		"build": "n8n-node build",
 		"build:watch": "tsc --watch",
@@ -32,11 +31,10 @@
 		"format": "prettier nodes credentials --write",
 		"lint": "n8n-node lint",
 		"lint:fix": "n8n-node lint --fix",
-		"release": "n8n-node release",
+		"release": "release-it",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"prepublishOnly": "n8n-node prerelease",
-		"version": "auto-changelog -p && git add CHANGELOG.md"
+		"prepublishOnly": "n8n-node prerelease"
 	},
 	"files": [
 		"dist"
@@ -52,19 +50,15 @@
 		]
 	},
 	"devDependencies": {
-		"@n8n/node-cli": "*",
+		"@n8n/node-cli": "^0.51.2",
+		"@types/luxon": "^3.7.6",
 		"@types/node": "^24.1.0",
-		"@typescript-eslint/eslint-plugin": "^8.59.3",
-		"@typescript-eslint/parser": "^8.59.3",
 		"@vitest/coverage-v8": "^4.1.2",
 		"eslint": "9.32.0",
-		"eslint-plugin-n8n-nodes-base": "^1.16.3",
-		"gulp": "^5.0.0",
 		"prettier": "3.6.2",
 		"release-it": "^19.0.4",
 		"typescript": "5.9.2",
-		"vitest": "^4.1.2",
-		"auto-changelog": "*"
+		"vitest": "^4.1.2"
 	},
 	"peerDependencies": {
 		"n8n-workflow": "*"

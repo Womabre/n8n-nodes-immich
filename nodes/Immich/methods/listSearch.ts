@@ -5,7 +5,7 @@ type SearchResultItem = { name: string; value: string };
 /** Performs an authenticated GET against the Immich API and returns the parsed body. */
 async function immichGet(ctx: ILoadOptionsFunctions, path: string, qs: IDataObject = {}): Promise<unknown> {
 	const credentials = await ctx.getCredentials('immichApi');
-	const baseUrl = String(credentials.host).replace(/\/$/, '');
+	const baseUrl = String(credentials.host).replace(/\/+$/, '');
 	return ctx.helpers.httpRequestWithAuthentication.call(ctx, 'immichApi', {
 		method: 'GET',
 		url: `${baseUrl}/api${path}`,

@@ -28,7 +28,8 @@ export class Immich implements INodeType {
 		usableAsTool: true,
 		version: 1,
 		group: ['transform'],
-		icon: 'file:Immich.svg',
+		// The multicolour Immich logo reads well on both themes, so one file serves both.
+		icon: { light: 'file:Immich.svg', dark: 'file:Immich.svg' },
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description: 'Interact with a self-hosted Immich photo and video management server',
 		defaults: {
@@ -44,7 +45,7 @@ export class Immich implements INodeType {
 			},
 		],
 		requestDefaults: {
-			baseURL: '={{$credentials.host}}/api',
+			baseURL: '={{$credentials.host.replace(/[/]+$/, "")}}/api',
 			headers: {
 				Accept: 'application/json',
 				'Content-Type': 'application/json',

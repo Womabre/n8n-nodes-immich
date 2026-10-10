@@ -1,8 +1,11 @@
+import { createHash } from 'crypto';
+import { DateTime } from 'luxon';
 import { IDataObject, IExecuteSingleFunctions, IHttpRequestOptions, INodeProperties } from 'n8n-workflow';
 import { processBinaryResponse } from '../utils/binary';
+import { dateTimeExpr, idListExpr, optionalExpr } from '../utils/expressions';
 
 interface MultipartField {
-	name: string;
+	key: string;
 	value: string;
 }
 
@@ -13,27 +16,48 @@ interface MultipartFile {
 	buffer: Buffer;
 }
 
+/**
+ * Escapes a value for a quoted Content-Disposition parameter (WHATWG form
+ * encoding): `"` and line breaks are percent-encoded so a filename cannot end
+ * the quoted string or inject a header line.
+ */
+function escapeQuoted(value: string): string {
+	return value.replace(/"/g, '%22').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+}
+
 // Hand-rolled multipart/form-data encoding — n8n Cloud disallows community
 // nodes from shipping npm dependencies, so the `form-data` package is off
 // the table for a single upload endpoint.
-function buildMultipartBody(fields: MultipartField[], file: MultipartFile): { body: Buffer; contentType: string } {
+export function buildMultipartBody(fields: MultipartField[], file: MultipartFile): { body: Buffer; contentType: string } {
 	const boundary = `n8nImmichBoundary${Math.random().toString(16).slice(2)}`;
 	const chunks: Buffer[] = [];
 	const push = (text: string) => chunks.push(Buffer.from(text, 'utf-8'));
 
-	for (const { name, value } of fields) {
+	for (const { key, value } of fields) {
 		push(`--${boundary}\r\n`);
-		push(`Content-Disposition: form-data; name="${name}"\r\n\r\n`);
+		push(`Content-Disposition: form-data; name="${escapeQuoted(key)}"\r\n\r\n`);
 		push(`${value}\r\n`);
 	}
 
 	push(`--${boundary}\r\n`);
-	push(`Content-Disposition: form-data; name="${file.name}"; filename="${file.filename}"\r\n`);
-	push(`Content-Type: ${file.contentType}\r\n\r\n`);
+	push(`Content-Disposition: form-data; name="${escapeQuoted(file.name)}"; filename="${escapeQuoted(file.filename)}"\r\n`);
+	push(`Content-Type: ${file.contentType.replace(/[\r\n]/g, '')}\r\n\r\n`);
 	chunks.push(file.buffer);
 	push(`\r\n--${boundary}--\r\n`);
 
 	return { body: Buffer.concat(chunks), contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
+/**
+ * ISO 8601 with an explicit offset; offset-less input (what n8n's date picker
+ * produces) is read in the workflow timezone. Immich 3 rejects timestamps
+ * without an offset. Unparseable input is passed through for the server to
+ * report.
+ */
+export function toOffsetDateTime(value: unknown, timeZone: string): string {
+	const text = String(value);
+	const parsed = DateTime.fromISO(text, { zone: timeZone });
+	return parsed.isValid ? (parsed.toISO() ?? text) : text;
 }
 
 async function prepareUploadFormData(
@@ -41,33 +65,34 @@ async function prepareUploadFormData(
 	requestOptions: IHttpRequestOptions,
 ): Promise<IHttpRequestOptions> {
 	const binaryPropertyName = this.getNodeParameter('binaryPropertyName') as string;
-	const fileCreatedAt = this.getNodeParameter('fileCreatedAt') as string;
-	const fileModifiedAt = this.getNodeParameter('fileModifiedAt') as string;
+	const timeZone = this.getTimezone();
+	const fileCreatedAt = toOffsetDateTime(this.getNodeParameter('fileCreatedAt'), timeZone);
+	const fileModifiedAt = toOffsetDateTime(this.getNodeParameter('fileModifiedAt'), timeZone);
 	const additionalFields = this.getNodeParameter('additionalFields', {}) as IDataObject;
 
-	const item = this.getInputData();
-	const binaryData = item.binary?.[binaryPropertyName];
-	this.helpers.assertBinaryData(binaryPropertyName);
+	const binaryData = this.helpers.assertBinaryData(binaryPropertyName);
 	const buffer = await this.helpers.getBinaryDataBuffer(binaryPropertyName);
+	const filename = (additionalFields.filename as string) || binaryData.fileName || 'upload';
 
 	const fields: MultipartField[] = [
-		{ name: 'fileCreatedAt', value: fileCreatedAt },
-		{ name: 'fileModifiedAt', value: fileModifiedAt },
+		{ key: 'fileCreatedAt', value: fileCreatedAt },
+		{ key: 'fileModifiedAt', value: fileModifiedAt },
+		{ key: 'filename', value: filename },
 	];
 	if (additionalFields.isFavorite !== undefined) {
-		fields.push({ name: 'isFavorite', value: String(additionalFields.isFavorite) });
+		fields.push({ key: 'isFavorite', value: String(additionalFields.isFavorite) });
 	}
 	if (additionalFields.duration !== undefined) {
-		fields.push({ name: 'duration', value: String(additionalFields.duration) });
+		fields.push({ key: 'duration', value: String(additionalFields.duration) });
 	}
 	if (additionalFields.visibility) {
-		fields.push({ name: 'visibility', value: additionalFields.visibility as string });
+		fields.push({ key: 'visibility', value: additionalFields.visibility as string });
 	}
 
 	const { body, contentType } = buildMultipartBody(fields, {
 		name: 'assetData',
-		filename: (additionalFields.filename as string) || binaryData?.fileName || 'upload',
-		contentType: binaryData?.mimeType || 'application/octet-stream',
+		filename,
+		contentType: binaryData.mimeType || 'application/octet-stream',
 		buffer,
 	});
 
@@ -79,9 +104,18 @@ async function prepareUploadFormData(
 	requestOptions.headers = {
 		...headers,
 		'Content-Type': contentType,
+		// Lets Immich recognise a file it already has and answer `duplicate`.
+		'x-immich-checksum': createHash('sha1').update(buffer).digest('hex'),
 	};
 	return requestOptions;
 }
+
+const visibilityOptions = [
+	{ name: 'Archive', value: 'archive' },
+	{ name: 'Hidden', value: 'hidden' },
+	{ name: 'Locked', value: 'locked' },
+	{ name: 'Timeline', value: 'timeline' },
+];
 
 export const operations: INodeProperties[] = [
 	{
@@ -126,18 +160,19 @@ export const operations: INodeProperties[] = [
 				name: 'Update',
 				value: 'update',
 				action: 'Update an asset',
-				description:
-					'Update favorite/description/rating/visibility on an asset (uses the single-asset update endpoint, which Immich currently marks deprecated with no non-deprecated single-asset replacement)',
+				description: 'Update the description, favorite, rating, visibility, date or location of an asset',
 				routing: {
 					request: {
 						method: 'PUT',
 						url: '=/assets/{{$parameter["assetId"]}}',
 						body: {
-							description: '={{$parameter["updateFields"]["description"] || undefined}}',
+							// An added-but-empty description clears it ("" is how Immich stores no description).
+							description: '={{$parameter["updateFields"]["description"]}}',
 							isFavorite: '={{$parameter["updateFields"]["isFavorite"]}}',
-							rating: '={{$parameter["updateFields"]["rating"]}}',
-							visibility: '={{$parameter["updateFields"]["visibility"] || undefined}}',
-							dateTimeOriginal: '={{$parameter["updateFields"]["dateTimeOriginal"] || undefined}}',
+							rating:
+								'={{$parameter["updateFields"]["rating"] === undefined ? undefined : $parameter["updateFields"]["rating"] === "unrated" ? null : Number($parameter["updateFields"]["rating"])}}',
+							visibility: optionalExpr('updateFields.visibility'),
+							dateTimeOriginal: dateTimeExpr('updateFields.dateTimeOriginal'),
 							latitude: '={{$parameter["updateFields"]["latitude"]}}',
 							longitude: '={{$parameter["updateFields"]["longitude"]}}',
 						},
@@ -148,13 +183,13 @@ export const operations: INodeProperties[] = [
 				name: 'Delete',
 				value: 'delete',
 				action: 'Delete assets',
-				description: 'Permanently delete one or more assets by ID',
+				description: 'Move one or more assets to the trash, or delete them permanently with Force',
 				routing: {
 					request: {
 						method: 'DELETE',
 						url: '/assets',
 						body: {
-							ids: '={{$parameter["assetIds"].split(",").map(id => id.trim())}}',
+							ids: idListExpr('assetIds'),
 							force: '={{$parameter["force"]}}',
 						},
 					},
@@ -207,9 +242,9 @@ export const operations: INodeProperties[] = [
 						method: 'GET',
 						url: '/assets/statistics',
 						qs: {
-							isFavorite: '={{$parameter["isFavorite"]}}',
-							isTrashed: '={{$parameter["isTrashed"]}}',
-							visibility: '={{$parameter["visibility"] || undefined}}',
+							isFavorite: '={{$parameter["filters"]["isFavorite"]}}',
+							isTrashed: '={{$parameter["filters"]["isTrashed"]}}',
+							visibility: optionalExpr('filters.visibility'),
 						},
 					},
 				},
@@ -259,12 +294,7 @@ export const operations: INodeProperties[] = [
 				displayName: 'Visibility',
 				name: 'visibility',
 				type: 'options',
-				options: [
-					{ name: 'Archive', value: 'archive' },
-					{ name: 'Hidden', value: 'hidden' },
-					{ name: 'Locked', value: 'locked' },
-					{ name: 'Timeline', value: 'timeline' },
-				],
+				options: visibilityOptions,
 				default: 'timeline',
 			},
 		],
@@ -297,21 +327,24 @@ export const operations: INodeProperties[] = [
 			{
 				displayName: 'Rating',
 				name: 'rating',
-				type: 'number',
-				typeOptions: { minValue: -1, maxValue: 5 },
+				type: 'options',
+				options: [
+					{ name: '1 Star', value: 1 },
+					{ name: '2 Stars', value: 2 },
+					{ name: '3 Stars', value: 3 },
+					{ name: '4 Stars', value: 4 },
+					{ name: '5 Stars', value: 5 },
+					{ name: 'Rejected', value: -1 },
+					{ name: 'Unrated', value: 'unrated' },
+				],
 				default: 1,
-				description: '1-5 stars, -1 rejected (0 is not a valid rating)',
+				description: 'Star rating, Rejected, or Unrated to clear the rating',
 			},
 			{
 				displayName: 'Visibility',
 				name: 'visibility',
 				type: 'options',
-				options: [
-					{ name: 'Archive', value: 'archive' },
-					{ name: 'Hidden', value: 'hidden' },
-					{ name: 'Locked', value: 'locked' },
-					{ name: 'Timeline', value: 'timeline' },
-				],
+				options: visibilityOptions,
 				default: 'timeline',
 			},
 		],
@@ -351,31 +384,35 @@ export const operations: INodeProperties[] = [
 
 	// Get Statistics
 	{
-		displayName: 'Is Favorite',
-		name: 'isFavorite',
-		type: 'boolean',
-		default: false,
+		displayName: 'Filters',
+		name: 'filters',
+		type: 'collection',
+		placeholder: 'Add Filter',
+		default: {},
+		description: 'Without filters, all assets are counted',
 		displayOptions: { show: { resource: ['asset'], operation: ['getStatistics'] } },
-	},
-	{
-		displayName: 'Is Trashed',
-		name: 'isTrashed',
-		type: 'boolean',
-		default: false,
-		displayOptions: { show: { resource: ['asset'], operation: ['getStatistics'] } },
-	},
-	{
-		displayName: 'Visibility',
-		name: 'visibility',
-		type: 'options',
 		options: [
-			{ name: 'Any', value: '' },
-			{ name: 'Archive', value: 'archive' },
-			{ name: 'Hidden', value: 'hidden' },
-			{ name: 'Locked', value: 'locked' },
-			{ name: 'Timeline', value: 'timeline' },
+			{
+				displayName: 'Is Favorite',
+				name: 'isFavorite',
+				type: 'boolean',
+				default: true,
+				description: 'Whether to count only favorites (true) or only non-favorites (false)',
+			},
+			{
+				displayName: 'Is Trashed',
+				name: 'isTrashed',
+				type: 'boolean',
+				default: true,
+				description: 'Whether to count only trashed assets (true) or only non-trashed ones (false)',
+			},
+			{
+				displayName: 'Visibility',
+				name: 'visibility',
+				type: 'options',
+				options: visibilityOptions,
+				default: 'timeline',
+			},
 		],
-		default: '',
-		displayOptions: { show: { resource: ['asset'], operation: ['getStatistics'] } },
 	},
 ];

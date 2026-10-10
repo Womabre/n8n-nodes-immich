@@ -10,7 +10,7 @@ export class ImmichApi implements ICredentialType {
 	name = 'immichApi';
 	displayName = 'Immich API';
 	documentationUrl = 'https://immich.app/docs/api/getting-started/';
-	icon: Icon = 'file:../nodes/Immich/Immich.svg';
+	icon: Icon = { light: 'file:../nodes/Immich/Immich.svg', dark: 'file:../nodes/Immich/Immich.svg' };
 	properties: INodeProperties[] = [
 		{
 			displayName: 'Immich URL',
@@ -45,7 +45,7 @@ export class ImmichApi implements ICredentialType {
 
 	test: ICredentialTestRequest = {
 		request: {
-			baseURL: '={{$credentials.host}}/api',
+			baseURL: '={{$credentials.host.replace(/[/]+$/, "")}}/api',
 			url: '/server/ping',
 			method: 'GET',
 		},

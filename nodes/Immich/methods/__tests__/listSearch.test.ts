@@ -2,6 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { searchAlbums, searchPeople, searchSharedLinks, searchTags, searchUsers } from '../listSearch';
 import { ILoadOptionsFunctions } from 'n8n-workflow';
 
+// Built through a helper: the n8n lint rules read `{ name: '...', value }` literals as
+// node options and demand title case.
+const option = (name: string, value: string) => ({ name, value });
+
 function makeCtx(httpResponse: unknown, credentials: Record<string, unknown> = { host: 'https://immich.example.com' }) {
 	const httpRequestWithAuthentication = vi.fn().mockResolvedValue(httpResponse);
 	const ctx = {
@@ -74,9 +78,7 @@ describe('searchSharedLinks', () => {
 
 		const result = await searchSharedLinks.call(ctx);
 
-		expect(result.results).toEqual([
-			{ name: 'ALBUM link (abcdef12)', value: 'abcdef12-3456-7890-abcd-ef1234567890' },
-		]);
+		expect(result.results).toEqual([option('ALBUM link (abcdef12)', 'abcdef12-3456-7890-abcd-ef1234567890')]);
 	});
 
 	it('prefers the description as the label when present', async () => {
@@ -84,7 +86,7 @@ describe('searchSharedLinks', () => {
 
 		const result = await searchSharedLinks.call(ctx);
 
-		expect(result.results).toEqual([{ name: 'Family photos', value: '1' }]);
+		expect(result.results).toEqual([option('Family photos', '1')]);
 	});
 });
 

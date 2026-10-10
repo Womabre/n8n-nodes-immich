@@ -1,5 +1,7 @@
 import { INodeProperties } from 'n8n-workflow';
 import { resourceLocatorModes } from '../parameters/shared-parameters';
+import { assertBulkSuccess } from '../utils/bulk';
+import { idListExpr, optionalExpr } from '../utils/expressions';
 
 export const operations: INodeProperties[] = [
 	{
@@ -23,8 +25,8 @@ export const operations: INodeProperties[] = [
 						url: '/tags',
 						body: {
 							name: '={{$parameter["name"]}}',
-							color: '={{$parameter["additionalFields"]["color"] || undefined}}',
-							parentId: '={{$parameter["additionalFields"]["parentId"] || undefined}}',
+							color: optionalExpr('additionalFields.color'),
+							parentId: optionalExpr('additionalFields.parentId'),
 						},
 					},
 				},
@@ -72,8 +74,11 @@ export const operations: INodeProperties[] = [
 						method: 'PUT',
 						url: '=/tags/{{$parameter["tagId"]}}/assets',
 						body: {
-							ids: '={{$parameter["assetIds"].split(",").map(id => id.trim())}}',
+							ids: idListExpr('assetIds'),
 						},
+					},
+					output: {
+						postReceive: [assertBulkSuccess],
 					},
 				},
 			},
@@ -87,8 +92,11 @@ export const operations: INodeProperties[] = [
 						method: 'DELETE',
 						url: '=/tags/{{$parameter["tagId"]}}/assets',
 						body: {
-							ids: '={{$parameter["assetIds"].split(",").map(id => id.trim())}}',
+							ids: idListExpr('assetIds'),
 						},
+					},
+					output: {
+						postReceive: [assertBulkSuccess],
 					},
 				},
 			},

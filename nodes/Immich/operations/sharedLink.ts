@@ -1,5 +1,7 @@
 import { INodeProperties } from 'n8n-workflow';
 import { resourceLocatorModes } from '../parameters/shared-parameters';
+import { assertBulkSuccess } from '../utils/bulk';
+import { clearableExpr, dateTimeExpr, idListExpr, idListJs, optionalExpr } from '../utils/expressions';
 
 export const operations: INodeProperties[] = [
 	{
@@ -23,8 +25,11 @@ export const operations: INodeProperties[] = [
 						method: 'PUT',
 						url: '=/shared-links/{{$parameter["sharedLinkId"]}}/assets',
 						body: {
-							assetIds: '={{$parameter["assetIds"].split(",").map(id => id.trim())}}',
+							assetIds: idListExpr('assetIds'),
 						},
+					},
+					output: {
+						postReceive: [assertBulkSuccess],
 					},
 				},
 			},
@@ -39,12 +44,11 @@ export const operations: INodeProperties[] = [
 						url: '/shared-links',
 						body: {
 							type: '={{$parameter["linkType"]}}',
-							albumId: '={{$parameter["linkType"] === "ALBUM" ? $parameter["targetId"] : undefined}}',
-							assetIds:
-								'={{$parameter["linkType"] === "INDIVIDUAL" ? $parameter["targetId"].split(",").map(id => id.trim()) : undefined}}',
-							description: '={{$parameter["additionalFields"]["description"] || undefined}}',
-							password: '={{$parameter["additionalFields"]["password"] || undefined}}',
-							expiresAt: '={{$parameter["additionalFields"]["expiresAt"] || undefined}}',
+							albumId: '={{$parameter["linkType"] === "ALBUM" ? $parameter["albumId"] : undefined}}',
+							assetIds: `={{$parameter["linkType"] === "INDIVIDUAL" ? ${idListJs('assetIds')} : undefined}}`,
+							description: optionalExpr('additionalFields.description'),
+							password: optionalExpr('additionalFields.password'),
+							expiresAt: dateTimeExpr('additionalFields.expiresAt'),
 							allowDownload: '={{$parameter["additionalFields"]["allowDownload"]}}',
 							allowUpload: '={{$parameter["additionalFields"]["allowUpload"]}}',
 							showMetadata: '={{$parameter["additionalFields"]["showMetadata"]}}',
@@ -83,7 +87,7 @@ export const operations: INodeProperties[] = [
 						method: 'GET',
 						url: '/shared-links',
 						qs: {
-							albumId: '={{$parameter["filters"]["albumId"] || undefined}}',
+							albumId: optionalExpr('filters.albumId'),
 						},
 					},
 				},
@@ -97,8 +101,11 @@ export const operations: INodeProperties[] = [
 						method: 'DELETE',
 						url: '=/shared-links/{{$parameter["sharedLinkId"]}}/assets',
 						body: {
-							assetIds: '={{$parameter["assetIds"].split(",").map(id => id.trim())}}',
+							assetIds: idListExpr('assetIds'),
 						},
+					},
+					output: {
+						postReceive: [assertBulkSuccess],
 					},
 				},
 			},
@@ -111,9 +118,9 @@ export const operations: INodeProperties[] = [
 						method: 'PATCH',
 						url: '=/shared-links/{{$parameter["sharedLinkId"]}}',
 						body: {
-							description: '={{$parameter["updateFields"]["description"] || undefined}}',
-							password: '={{$parameter["updateFields"]["password"] || undefined}}',
-							expiresAt: '={{$parameter["updateFields"]["expiresAt"] || undefined}}',
+							description: clearableExpr('updateFields.description'),
+							password: clearableExpr('updateFields.password'),
+							expiresAt: dateTimeExpr('updateFields.expiresAt', { clearable: true }),
 							allowDownload: '={{$parameter["updateFields"]["allowDownload"]}}',
 							allowUpload: '={{$parameter["updateFields"]["allowUpload"]}}',
 							showMetadata: '={{$parameter["updateFields"]["showMetadata"]}}',
@@ -140,7 +147,7 @@ export const operations: INodeProperties[] = [
 	},
 	{
 		displayName: 'Album',
-		name: 'targetId',
+		name: 'albumId',
 		type: 'resourceLocator',
 		default: { mode: 'list', value: '' },
 		required: true,
@@ -150,7 +157,7 @@ export const operations: INodeProperties[] = [
 	},
 	{
 		displayName: 'Asset IDs',
-		name: 'targetId',
+		name: 'assetIds',
 		type: 'string',
 		default: '',
 		required: true,
@@ -210,9 +217,28 @@ export const operations: INodeProperties[] = [
 		options: [
 			{ displayName: 'Allow Download', name: 'allowDownload', type: 'boolean', default: true },
 			{ displayName: 'Allow Upload', name: 'allowUpload', type: 'boolean', default: false },
-			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
-			{ displayName: 'Expires At', name: 'expiresAt', type: 'dateTime', default: '' },
-			{ displayName: 'Password', name: 'password', type: 'string', typeOptions: { password: true }, default: '' },
+			{
+				displayName: 'Description',
+				name: 'description',
+				type: 'string',
+				default: '',
+				description: 'Leave empty to remove the description',
+			},
+			{
+				displayName: 'Expires At',
+				name: 'expiresAt',
+				type: 'dateTime',
+				default: '',
+				description: 'Leave empty to make the link never expire',
+			},
+			{
+				displayName: 'Password',
+				name: 'password',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+				description: 'Leave empty to remove the password',
+			},
 			{ displayName: 'Show Metadata', name: 'showMetadata', type: 'boolean', default: true },
 		],
 	},

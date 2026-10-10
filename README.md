@@ -26,11 +26,11 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 | -------------- | ------------------------------------------------------------------------- |
 | Upload         | Upload a photo or video to Immich                                       |
 | Get            | Retrieve asset info by ID                                                |
-| Update         | Update favorite/description/rating/visibility on an asset                |
-| Delete         | Permanently delete one or more assets by ID                              |
+| Update         | Update description, favorite, rating, visibility, date or location        |
+| Delete         | Move assets to the trash, or delete them permanently with Force          |
 | Download       | Download the original file for an asset                                 |
 | View           | Retrieve the thumbnail or preview image for an asset                     |
-| Get Statistics | Get counts of images/videos for the current user, optionally filtered   |
+| Get Statistics | Count images/videos for the current user; counts everything unless filtered |
 
 ### Album
 
@@ -38,7 +38,7 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 | ----------------- | ------------------------------------------------ |
 | Create            | Create a new album, optionally seeded with assets |
 | Get               | Retrieve an album by ID                          |
-| Get Many          | List albums, optionally filtered                 |
+| Get Many          | List albums, filtered by shared/owned status, name or asset |
 | Update            | Update an album's name, description, thumbnail, or sort order |
 | Delete            | Delete an album                                  |
 | Add Assets        | Add assets to an album                           |
@@ -51,15 +51,15 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 | Operation         | Description                                                                |
 | ------------------ | ---------------------------------------------------------------------------- |
-| Search Metadata    | Find assets by structured metadata filters (favorites, album, people, tags…) |
-| Search Smart       | CLIP-powered natural-language / visual-similarity search                    |
+| Search Metadata    | Find assets by structured metadata filters (favorites, album, people, tags…); supports Return All |
+| Search Smart       | CLIP-powered natural-language / visual-similarity search; supports Return All |
 | Get Suggestions    | Get known values for a metadata facet (city, camera make, etc.)             |
 
 ### Person
 
 | Operation | Description                                       |
 | --------- | -------------------------------------------------- |
-| Get Many  | List the people (recognized faces) in your library |
+| Get Many  | List the people (recognized faces) in your library; supports Return All |
 | Get       | Retrieve a person by ID                            |
 | Update    | Rename, favorite, hide, or set the birth date       |
 | Merge     | Merge duplicate people into one                    |
@@ -107,6 +107,15 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 ---
 
+## Usage notes
+
+- **ID lists:** fields that take several IDs accept a comma-separated string or an array, e.g. `{{ $json.assetIds }}`. Empty entries are ignored.
+- **Bulk results:** Add/Remove Assets, Tag/Untag Assets and Merge fail the node if Immich rejects any ID, listing each ID and reason. IDs that were already present (`duplicate`) count as success, so re-runs are safe.
+- **Dates:** date-times without a timezone offset (what the date picker produces) are read in the workflow timezone.
+- **Clearing values:** in an Update operation, add a description, password or expiry field and leave it empty to remove that value. For asset ratings, pick **Unrated**.
+
+---
+
 ## Credentials
 
 The node authenticates using an Immich API key.
@@ -121,7 +130,7 @@ Required fields:
 ## Compatibility
 
 - **Node.js:** `>=20.15`
-- Built against the Immich OpenAPI spec (Immich 3.0.1)
+- **Immich:** 3.0 or newer. Checked against the Immich 3.3.1 OpenAPI spec. Immich 2.x is not supported: its upload requires `deviceAssetId`/`deviceId` and its album filter uses a different parameter.
 
 ---
 
