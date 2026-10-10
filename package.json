@@ -1,0 +1,72 @@
+{
+	"name": "n8n-nodes-immich",
+	"version": "0.1.0",
+	"publisher": "Womabre",
+	"description": "n8n community node for interacting with the Immich self-hosted photo and video management API",
+	"license": "MIT",
+	"keywords": [
+		"n8n-community-node-package",
+		"n8n",
+		"immich",
+		"photos",
+		"self-hosted",
+		"media"
+	],
+	"homepage": "https://github.com/Womabre/n8n-nodes-immich",
+	"author": {
+		"name": "Wouter Breedveld",
+		"email": "w.m.breedveld@gmail.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Womabre/n8n-nodes-immich.git"
+	},
+	"engines": {
+		"node": ">=20.15"
+	},
+	"main": "index.js",
+	"scripts": {
+		"build": "n8n-node build",
+		"build:watch": "tsc --watch",
+		"dev": "n8n-node dev",
+		"format": "prettier nodes credentials --write",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"release": "n8n-node release",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"prepublishOnly": "n8n-node prerelease",
+		"version": "auto-changelog -p && git add CHANGELOG.md"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": true,
+		"credentials": [
+			"dist/credentials/ImmichApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/Immich/Immich.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "*",
+		"@types/node": "^24.1.0",
+		"@typescript-eslint/eslint-plugin": "^8.59.3",
+		"@typescript-eslint/parser": "^8.59.3",
+		"@vitest/coverage-v8": "^4.1.2",
+		"eslint": "9.32.0",
+		"eslint-plugin-n8n-nodes-base": "^1.16.3",
+		"gulp": "^5.0.0",
+		"prettier": "3.6.2",
+		"release-it": "^19.0.4",
+		"typescript": "5.9.2",
+		"vitest": "^4.1.2",
+		"auto-changelog": "*"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}
