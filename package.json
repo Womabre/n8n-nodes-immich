@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-immich-api",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"publisher": "Womabre",
 	"description": "n8n community node for interacting with the Immich self-hosted photo and video management API",
 	"license": "MIT",

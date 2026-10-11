@@ -6,9 +6,19 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-11
+
+### Changed
+
+- Releases publish through npm Trusted Publishing (OIDC) from `.github/workflows/publish.yml`. No npm token is stored in the repository.
+
+### Fixed
+
+- The 0.2.0 changelog entry said the release had not been published to npm. 0.2.0 was the first npm release.
+
 ## [0.2.0] - 2026-10-10
 
-Neither 0.1.0 nor 0.2.0 has been published to npm. Parameter changes marked **Breaking** only affect workflows built against a local 0.1.0 build.
+First release on npm. 0.1.0 was never published, so parameter changes marked **Breaking** only affect workflows built against a local 0.1.0 build.
 
 ### Added
 
@@ -57,5 +67,6 @@ Neither 0.1.0 nor 0.2.0 has been published to npm. Parameter changes marked **Br
 
 - First Immich release: an `Immich` node and an `ImmichApi` credential (API key) covering Asset, Album, Search, Person, Tag, Shared Link, User and Server. The package began as a copy of `n8n-nodes-autodesk-vault-data-api` and was rewritten from scratch.
 
-[Unreleased]: https://github.com/Womabre/n8n-nodes-immich/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/Womabre/n8n-nodes-immich/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/Womabre/n8n-nodes-immich/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/Womabre/n8n-nodes-immich/releases/tag/0.2.0
