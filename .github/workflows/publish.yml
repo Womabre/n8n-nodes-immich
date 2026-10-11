@@ -1,0 +1,80 @@
+# Publishes the package to npm with a provenance attestation when a version
+# tag (e.g. 0.2.0) is pushed. n8n requires community nodes to be published
+# from GitHub Actions with provenance since May 1 2026.
+#
+# These steps mirror what `n8n-node release` does in CI (lint, build,
+# `npm publish` with RELEASE_MODE and provenance), plus the test suite. They
+# are spelled out because `n8n-node` does not recognise bun as a package
+# manager, and because the local `release` script runs release-it, which
+# would try to bump the version again here.
+#
+# One-time setup, either of:
+#   A. npm Trusted Publishing (preferred, no secrets): on npmjs.com, package
+#      settings > Trusted Publisher > GitHub Actions, with owner `Womabre`,
+#      repository `n8n-nodes-immich`, workflow `publish.yml`. Leave the
+#      NPM_TOKEN secret unset.
+#   B. A granular npm access token with publish rights, stored as the
+#      NPM_TOKEN repository secret. Provenance is still attached.
+#
+# Release: move the CHANGELOG [Unreleased] entries under a new version, then
+# run `bun run release` locally; it commits, tags and pushes.
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Mints the OIDC token used for Trusted Publishing and provenance.
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches package.json
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+      - uses: oven-sh/setup-bun@v2
+
+      # Node 24 ships npm 11, which Trusted Publishing needs (npm >= 11.5.1,
+      # Node >= 22.14).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+      - name: Publish
+        # bun cannot publish with OIDC or provenance, so this step uses npm.
+        run: |
+          npm install -g npm@^11.5.1
+          npm publish --provenance --access public
+        env:
+          # Lets the package's prepublishOnly guard (`n8n-node prerelease`) pass.
+          RELEASE_MODE: 'true'
+          # Only used for option B; with Trusted Publishing it stays empty.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -22,6 +22,8 @@ Neither 0.1.0 nor 0.2.0 has been published to npm. Parameter changes marked **Br
 
 ### Changed
 
+- The npm package is named `n8n-nodes-immich-api`, because `n8n-nodes-immich` on npm belongs to an unrelated project. The GitHub repository keeps its name.
+- Publishing runs from GitHub Actions (`.github/workflows/publish.yml`) on a version tag push, with an npm provenance attestation as n8n requires.
 - **Breaking:** Asset Get Statistics filters (Is Favorite, Is Trashed, Visibility) moved into an optional Filters collection.
 - **Breaking:** Shared Link Create uses `albumId` (Album) and `assetIds` (Individual Assets) instead of one shared `targetId` parameter.
 - **Breaking:** the Page and Size filters on Search and Person Get Many are replaced by Return All and Limit.
@@ -47,6 +49,7 @@ Neither 0.1.0 nor 0.2.0 has been published to npm. Parameter changes marked **Br
 - Shared-link `expiresAt`, search `takenAfter`/`takenBefore`, asset `dateTimeOriginal` and upload dates from the date picker had no timezone offset, so Immich 3 rejected them.
 - Person `birthDate` was sent as a date-time. Immich expects `YYYY-MM-DD`.
 - Upload filenames containing `"` or line breaks broke the multipart request.
+- The TypeScript build cache (`tsconfig.tsbuildinfo`, 218 KB) is no longer built into `dist/`, so it does not ship in the npm package.
 
 ## [0.1.0] - 2026-07-08
 
@@ -54,6 +57,5 @@ Neither 0.1.0 nor 0.2.0 has been published to npm. Parameter changes marked **Br
 
 - First Immich release: an `Immich` node and an `ImmichApi` credential (API key) covering Asset, Album, Search, Person, Tag, Shared Link, User and Server. The package began as a copy of `n8n-nodes-autodesk-vault-data-api` and was rewritten from scratch.
 
-[Unreleased]: https://github.com/Womabre/n8n-nodes-immich/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/Womabre/n8n-nodes-immich/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Womabre/n8n-nodes-immich/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Womabre/n8n-nodes-immich/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/Womabre/n8n-nodes-immich/releases/tag/0.2.0

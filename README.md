@@ -1,4 +1,4 @@
-# n8n-nodes-immich
+# n8n-nodes-immich-api
 
 This is an n8n community node for interacting with [Immich](https://immich.app/), the self-hosted photo and video management solution. It lets you upload, organize, search, and share your Immich library directly from n8n workflows.
 
@@ -14,7 +14,9 @@ This is an n8n community node for interacting with [Immich](https://immich.app/)
 
 ## Installation
 
-Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
+Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation, and install the npm package **`n8n-nodes-immich-api`**.
+
+(`n8n-nodes-immich` on npm is a different, unrelated project.)
 
 ---
 
