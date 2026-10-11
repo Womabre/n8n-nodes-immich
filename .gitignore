@@ -8,3 +8,5 @@ yarn.lock
 .vscode/launch.json
 *.tsbuildinfo
 coverage
+ISA.md
+.claude
