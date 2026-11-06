@@ -9,6 +9,7 @@ All notable changes to this project are documented in this file. The format is b
 ### Added
 
 - Album **Create or Update** operation: creates an album if no album with the given name exists, otherwise adds the assets to the existing album. Useful for idempotent workflows — re-running with the same album name does not create a duplicate album, and assets already present are reported as `duplicate` (counted as success).
+- Search Metadata: **Original File Name** filter, for matching assets by their original file name (e.g. `IMG_1234.jpg`). Available on Search Metadata only — Immich's Smart Search endpoint does not accept this field.
 
 ### Fixed
 

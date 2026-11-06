@@ -59,6 +59,17 @@ const sharedSearchFilterOptions: INodeProperties['options'] = [
 	{ displayName: 'Make', name: 'make', type: 'string', default: '', routing: optionalSend('body', 'make') },
 	{ displayName: 'Model', name: 'model', type: 'string', default: '', routing: optionalSend('body', 'model') },
 	{
+		displayName: 'Original File Name',
+		name: 'originalFileName',
+		type: 'string',
+		default: '',
+		description: 'Filter by the original file name (e.g. IMG_1234.jpg). Search Metadata only.',
+		// `originalFileName` exists on Immich's MetadataSearchDto but not on
+		// SmartSearchDto, so gate the filter to the Metadata operation only.
+		displayOptions: { show: { operation: ['searchMetadata'] } },
+		routing: optionalSend('body', 'originalFileName'),
+	},
+	{
 		displayName: 'Taken After',
 		name: 'takenAfter',
 		type: 'dateTime',

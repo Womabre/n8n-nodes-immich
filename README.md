@@ -54,7 +54,7 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 | Operation         | Description                                                                |
 | ------------------ | ---------------------------------------------------------------------------- |
-| Search Metadata    | Find assets by structured metadata filters (favorites, album, people, tags…); supports Return All |
+| Search Metadata    | Find assets by structured metadata filters (favorites, album, people, tags, original file name…); supports Return All |
 | Search Smart       | CLIP-powered natural-language / visual-similarity search; supports Return All |
 | Get Suggestions    | Get known values for a metadata facet (city, camera make, etc.)             |
 

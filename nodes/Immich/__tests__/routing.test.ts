@@ -155,6 +155,25 @@ describe('Search', () => {
 		expect(body).not.toHaveProperty('page');
 		expect(body.size).toBe(50);
 	});
+
+	it('sends originalFileName for Search Metadata but not for Smart Search', () => {
+		const { body: metadataBody } = resolveRequest({
+			resource: 'search',
+			operation: 'searchMetadata',
+			filters: { originalFileName: 'IMG_1234.jpg' },
+		});
+		expect(metadataBody.originalFileName).toBe('IMG_1234.jpg');
+
+		const { body: smartBody } = resolveRequest({
+			resource: 'search',
+			operation: 'searchSmart',
+			query: 'dog',
+			filters: { originalFileName: 'IMG_1234.jpg' },
+		} as never);
+		// `originalFileName` is not a field on Immich's SmartSearchDto, so the
+		// filter is gated to the Metadata operation and must not be sent for Smart.
+		expect(smartBody).not.toHaveProperty('originalFileName');
+	});
 });
 
 describe('bulk operations', () => {
