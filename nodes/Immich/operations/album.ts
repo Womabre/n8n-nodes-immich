@@ -2,6 +2,7 @@ import { INodeProperties } from 'n8n-workflow';
 import { resourceLocatorModes } from '../parameters/shared-parameters';
 import { assertBulkSuccess } from '../utils/bulk';
 import { clearableSend, idListSend, optionalSend } from '../utils/expressions';
+import { resolveUpsertAlbum } from '../utils/upsert';
 
 export const operations: INodeProperties[] = [
 	{
@@ -52,6 +53,29 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'POST',
 						url: '/albums',
+					},
+				},
+			},
+			{
+				name: 'Create or Update',
+				value: 'upsert',
+				action: 'Create an album or add assets to it',
+				description: 'Create a new record, or update the current one if it already exists (upsert)',
+				routing: {
+					request: {
+						method: 'POST',
+						url: '/albums',
+					},
+					send: {
+						preSend: [resolveUpsertAlbum],
+					},
+					// `assertBulkSuccess` is harmless on the create branch: the POST /albums
+					// response is a single album object with no `success` field, so the filter
+					// passes everything through. On the add-assets branch (PUT) it turns
+					// failed IDs into a node error, with `duplicate` counting as success so
+					// re-runs stay idempotent.
+					output: {
+						postReceive: [assertBulkSuccess],
 					},
 				},
 			},
@@ -154,14 +178,17 @@ export const operations: INodeProperties[] = [
 		default: 'create',
 	},
 
-	// Create
+	// Create / Upsert
 	{
 		displayName: 'Album Name',
 		name: 'albumName',
 		type: 'string',
 		default: '',
 		required: true,
-		displayOptions: { show: { resource: ['album'], operation: ['create'] } },
+		displayOptions: { show: { resource: ['album'], operation: ['create', 'upsert'] } },
+		// For `create` this sends `albumName` in the body. For `upsert` the preSend
+		// hook rewrites the body entirely (and reads albumName via getNodeParameter),
+		// so this send is a no-op on that branch.
 		routing: optionalSend('body', 'albumName'),
 	},
 	{
@@ -188,6 +215,18 @@ export const operations: INodeProperties[] = [
 				routing: idListSend('body', 'assetIds'),
 			},
 		],
+	},
+
+	// Upsert — asset IDs (consumed by the preSend hook, not via routing.send,
+	// because the body shape differs between the create and add-assets branches)
+	{
+		displayName: 'Asset IDs',
+		name: 'assetIds',
+		type: 'string',
+		default: '',
+		required: true,
+		description: 'Comma-separated list of asset IDs to add to the album',
+		displayOptions: { show: { resource: ['album'], operation: ['upsert'] } },
 	},
 
 	// Add User — body is a single object `albumUsers: [{ userId, role }]` built

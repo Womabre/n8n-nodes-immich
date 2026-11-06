@@ -6,9 +6,13 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Added
+
+- Album **Create or Update** operation: creates an album if no album with the given name exists, otherwise adds the assets to the existing album. Useful for idempotent workflows — re-running with the same album name does not create a duplicate album, and assets already present are reported as `duplicate` (counted as success).
+
 ### Fixed
 
-- Filter and update fields that the user fills with an expression (e.g. Album Get Many's `name` filter set to `{{ $json.albumName }}` from a previous node) now resolve the expression before sending it to Immich. Previously the literal expression text was shipped, so the API matched nothing and returned empty results. Affects string, date, date-time and ID-list fields across Album, Asset, Person, Search, Shared Link and Tag operations.
+- Filter and update fields that the user fills with an expression (e.g. Album Get Many's `name` filter set to `={{ $json.albumName }}` from a previous node) now resolve the expression before sending it to Immich. Previously the literal expression text was shipped, so the API matched nothing and returned empty results. Affects string, date, date-time and ID-list fields across Album, Asset, Person, Search, Shared Link and Tag operations.
 
 ## [0.2.1] - 2026-10-11
 

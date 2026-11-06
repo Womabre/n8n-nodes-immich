@@ -39,6 +39,7 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 | Operation        | Description                                     |
 | ----------------- | ------------------------------------------------ |
 | Create            | Create a new album, optionally seeded with assets |
+| Create or Update  | Create a new album, or add assets to it if an album with that name already exists (upsert) |
 | Get               | Retrieve an album by ID                          |
 | Get Many          | List albums, filtered by shared/owned status, name or asset |
 | Update            | Update an album's name, description, thumbnail, or sort order |
