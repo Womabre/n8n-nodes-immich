@@ -69,14 +69,15 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 ### Tag
 
-| Operation     | Description                          |
-| ------------- | --------------------------------------- |
-| Create        | Create a tag                          |
-| Get Many      | List tags                             |
-| Get           | Retrieve a tag by ID                  |
-| Delete        | Delete a tag                          |
-| Tag Assets    | Apply a tag to one or more assets     |
-| Untag Assets  | Remove a tag from one or more assets  |
+| Operation        | Description                          |
+| ---------------- | --------------------------------------- |
+| Create           | Create a tag                          |
+| Create or Update | Create tags (if missing) and apply them to assets — multiple tags at once |
+| Get Many         | List tags                             |
+| Get              | Retrieve a tag by ID                  |
+| Delete           | Delete a tag                          |
+| Tag Assets       | Apply a tag to one or more assets     |
+| Untag Assets     | Remove a tag from one or more assets  |
 
 ### Shared Link
 

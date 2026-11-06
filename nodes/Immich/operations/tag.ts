@@ -2,6 +2,7 @@ import { INodeProperties } from 'n8n-workflow';
 import { resourceLocatorModes } from '../parameters/shared-parameters';
 import { assertBulkSuccess } from '../utils/bulk';
 import { idListSend, optionalSend } from '../utils/expressions';
+import { resolveUpsertTagAssets } from '../utils/upsert';
 
 export const operations: INodeProperties[] = [
 	{
@@ -23,6 +24,21 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'POST',
 						url: '/tags',
+					},
+				},
+			},
+			{
+				name: 'Create or Update',
+				value: 'upsertTags',
+				action: 'Create tags or tag assets with them',
+				description: 'Create a new record, or update the current one if it already exists (upsert)',
+				routing: {
+					request: {
+						method: 'GET',
+						url: '/tags',
+					},
+					send: {
+						preSend: [resolveUpsertTagAssets],
 					},
 				},
 			},
@@ -101,6 +117,26 @@ export const operations: INodeProperties[] = [
 		required: true,
 		displayOptions: { show: { resource: ['tag'], operation: ['create'] } },
 		routing: optionalSend('body', 'name'),
+	},
+	{
+		displayName: 'Tag Names',
+		name: 'tagNames',
+		type: 'string',
+		default: '',
+		required: true,
+		// shortcut: comma-separated, so a tag name that itself contains a comma can't be expressed.
+		// Upgrade (only if requested) to a fixedCollection for names with commas.
+		description: 'Comma-separated tag names. Missing tags are created; matched against the full tag path (e.g. Holiday or Holiday/Summer).',
+		displayOptions: { show: { resource: ['tag'], operation: ['upsertTags'] } },
+	},
+	{
+		displayName: 'Asset IDs',
+		name: 'assetIds',
+		type: 'string',
+		default: '',
+		required: true,
+		description: 'Comma-separated list of asset IDs to tag',
+		displayOptions: { show: { resource: ['tag'], operation: ['upsertTags'] } },
 	},
 	{
 		displayName: 'Additional Fields',
