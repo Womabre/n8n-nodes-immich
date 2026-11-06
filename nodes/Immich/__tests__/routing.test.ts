@@ -170,8 +170,9 @@ describe('Search', () => {
 			query: 'dog',
 			filters: { originalFileName: 'IMG_1234.jpg' },
 		} as never);
-		// `originalFileName` is not a field on Immich's SmartSearchDto, so the
-		// filter is gated to the Metadata operation and must not be sent for Smart.
+		// `originalFileName` is not a field on Immich's SmartSearchDto, so it only
+		// appears in the Metadata version of the Filters collection; Smart Search
+		// uses the shared filter list, which omits it.
 		expect(smartBody).not.toHaveProperty('originalFileName');
 	});
 });

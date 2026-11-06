@@ -59,17 +59,6 @@ const sharedSearchFilterOptions: INodeProperties['options'] = [
 	{ displayName: 'Make', name: 'make', type: 'string', default: '', routing: optionalSend('body', 'make') },
 	{ displayName: 'Model', name: 'model', type: 'string', default: '', routing: optionalSend('body', 'model') },
 	{
-		displayName: 'Original File Name',
-		name: 'originalFileName',
-		type: 'string',
-		default: '',
-		description: 'Filter by the original file name (e.g. IMG_1234.jpg). Search Metadata only.',
-		// `originalFileName` exists on Immich's MetadataSearchDto but not on
-		// SmartSearchDto, so gate the filter to the Metadata operation only.
-		displayOptions: { show: { operation: ['searchMetadata'] } },
-		routing: optionalSend('body', 'originalFileName'),
-	},
-	{
 		displayName: 'Taken After',
 		name: 'takenAfter',
 		type: 'dateTime',
@@ -84,6 +73,22 @@ const sharedSearchFilterOptions: INodeProperties['options'] = [
 		routing: dateTimeSend('body', 'takenBefore'),
 	},
 	{ displayName: 'Include EXIF', name: 'withExif', type: 'boolean', default: false },
+];
+
+// `originalFileName` exists on Immich's MetadataSearchDto but not on SmartSearchDto.
+// n8n forbids `displayOptions` on a `collection` child, so the only way to expose
+// this field to Search Metadata alone is a separate options array + a second
+// `Filters` collection definition gated to the Metadata operation.
+const metadataSearchFilterOptions: INodeProperties['options'] = [
+	...sharedSearchFilterOptions,
+	{
+		displayName: 'Original File Name',
+		name: 'originalFileName',
+		type: 'string',
+		default: '',
+		description: 'Filter by the original file name (e.g. IMG_1234.jpg)',
+		routing: optionalSend('body', 'originalFileName'),
+	},
 ];
 
 export const operations: INodeProperties[] = [
@@ -192,16 +197,27 @@ export const operations: INodeProperties[] = [
 		routing: optionalSend('body', 'query'),
 	},
 
-	// Search Metadata + Smart shared filters
+	// Search Metadata + Smart shared pagination/limit
 	...returnAllAndLimit('search', ['searchMetadata', 'searchSmart'], 'body'),
+	// Filters for Search Smart — shared filters only (no `originalFileName`).
 	{
 		displayName: 'Filters',
 		name: 'filters',
 		type: 'collection',
 		placeholder: 'Add Filter',
 		default: {},
-		displayOptions: { show: { resource: ['search'], operation: ['searchMetadata', 'searchSmart'] } },
+		displayOptions: { show: { resource: ['search'], operation: ['searchSmart'] } },
 		options: sharedSearchFilterOptions,
+	},
+	// Filters for Search Metadata — shared filters plus Original File Name.
+	{
+		displayName: 'Filters',
+		name: 'filters',
+		type: 'collection',
+		placeholder: 'Add Filter',
+		default: {},
+		displayOptions: { show: { resource: ['search'], operation: ['searchMetadata'] } },
+		options: metadataSearchFilterOptions,
 	},
 
 	// Get Suggestions
