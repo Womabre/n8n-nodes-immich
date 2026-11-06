@@ -103,6 +103,30 @@ describe('Album > Get Many', () => {
 		expect(qs).toEqual({ isShared: true, isOwned: false, name: 'Holiday', assetId: undefined });
 		expect(qs).not.toHaveProperty('shared');
 	});
+
+	// Regression: `name`/`assetId` used to be read back via `$parameter["filters"]["name"]`,
+	// which returns nested values verbatim without resolving `={{ }}` expressions. A user
+	// filling the filter with `={{ $json.name }}` (expression mode, the default when dragging
+	// a field from a previous node) shipped the literal expression text and Immich matched
+	// nothing. The fields now use `routing.send` with `$value`, which n8n resolves through
+	// `getNodeParameter` before the value reaches the request.
+	it('resolves an expression in the `name` filter instead of shipping the literal text', () => {
+		const { qs } = resolveRequest({
+			resource: 'album',
+			operation: 'getAll',
+			filters: { name: '={{ "Holiday" }}' },
+		});
+		expect(qs.name).toBe('Holiday');
+	});
+
+	it('omits the `name` filter when the expression resolves to empty', () => {
+		const { qs } = resolveRequest({
+			resource: 'album',
+			operation: 'getAll',
+			filters: { name: '={{ "" }}' },
+		});
+		expect(qs.name).toBeUndefined();
+	});
 });
 
 describe('Person > Update', () => {
@@ -118,7 +142,7 @@ describe('Person > Update', () => {
 });
 
 describe('Search', () => {
-	it('sends ID lists and offset dates, without page/size in the operation body', () => {
+	it('sends ID lists and offset dates, with default page size but no page number', () => {
 		const { body } = resolveRequest({
 			resource: 'search',
 			operation: 'searchMetadata',
@@ -126,8 +150,10 @@ describe('Search', () => {
 		});
 		expect(body.personIds).toEqual(['p1', 'p2']);
 		expect(body.takenAfter).toBe('2026-01-01T00:00:00.000+01:00');
+		// `page` is added only by the pagination handler when Return All is on.
+		// `size` comes from the Limit field (default 50) and is always sent.
 		expect(body).not.toHaveProperty('page');
-		expect(body).not.toHaveProperty('size');
+		expect(body.size).toBe(50);
 	});
 });
 

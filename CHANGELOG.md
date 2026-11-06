@@ -6,6 +6,10 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Fixed
+
+- Filter and update fields that the user fills with an expression (e.g. Album Get Many's `name` filter set to `{{ $json.albumName }}` from a previous node) now resolve the expression before sending it to Immich. Previously the literal expression text was shipped, so the API matched nothing and returned empty results. Affects string, date, date-time and ID-list fields across Album, Asset, Person, Search, Shared Link and Tag operations.
+
 ## [0.2.1] - 2026-10-11
 
 ### Changed

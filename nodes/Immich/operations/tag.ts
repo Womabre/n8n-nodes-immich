@@ -1,7 +1,7 @@
 import { INodeProperties } from 'n8n-workflow';
 import { resourceLocatorModes } from '../parameters/shared-parameters';
 import { assertBulkSuccess } from '../utils/bulk';
-import { idListExpr, optionalExpr } from '../utils/expressions';
+import { idListSend, optionalSend } from '../utils/expressions';
 
 export const operations: INodeProperties[] = [
 	{
@@ -23,11 +23,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'POST',
 						url: '/tags',
-						body: {
-							name: '={{$parameter["name"]}}',
-							color: optionalExpr('additionalFields.color'),
-							parentId: optionalExpr('additionalFields.parentId'),
-						},
 					},
 				},
 			},
@@ -73,9 +68,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'PUT',
 						url: '=/tags/{{$parameter["tagId"]}}/assets',
-						body: {
-							ids: idListExpr('assetIds'),
-						},
 					},
 					output: {
 						postReceive: [assertBulkSuccess],
@@ -91,9 +83,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'DELETE',
 						url: '=/tags/{{$parameter["tagId"]}}/assets',
-						body: {
-							ids: idListExpr('assetIds'),
-						},
 					},
 					output: {
 						postReceive: [assertBulkSuccess],
@@ -111,6 +100,7 @@ export const operations: INodeProperties[] = [
 		default: '',
 		required: true,
 		displayOptions: { show: { resource: ['tag'], operation: ['create'] } },
+		routing: optionalSend('body', 'name'),
 	},
 	{
 		displayName: 'Additional Fields',
@@ -120,8 +110,20 @@ export const operations: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['tag'], operation: ['create'] } },
 		options: [
-			{ displayName: 'Color', name: 'color', type: 'color', default: '' },
-			{ displayName: 'Parent Tag ID', name: 'parentId', type: 'string', default: '' },
+			{
+				displayName: 'Color',
+				name: 'color',
+				type: 'color',
+				default: '',
+				routing: optionalSend('body', 'color'),
+			},
+			{
+				displayName: 'Parent Tag ID',
+				name: 'parentId',
+				type: 'string',
+				default: '',
+				routing: optionalSend('body', 'parentId'),
+			},
 		],
 	},
 
@@ -144,5 +146,6 @@ export const operations: INodeProperties[] = [
 		required: true,
 		description: 'Comma-separated list of asset IDs',
 		displayOptions: { show: { resource: ['tag'], operation: ['tagAssets', 'untagAssets'] } },
+		routing: idListSend('body', 'ids'),
 	},
 ];

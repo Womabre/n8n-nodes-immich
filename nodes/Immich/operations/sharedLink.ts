@@ -1,7 +1,7 @@
 import { INodeProperties } from 'n8n-workflow';
 import { resourceLocatorModes } from '../parameters/shared-parameters';
 import { assertBulkSuccess } from '../utils/bulk';
-import { clearableExpr, dateTimeExpr, idListExpr, idListJs, optionalExpr } from '../utils/expressions';
+import { clearableSend, dateTimeSend, idListSend, idListJs, optionalSend } from '../utils/expressions';
 
 export const operations: INodeProperties[] = [
 	{
@@ -24,9 +24,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'PUT',
 						url: '=/shared-links/{{$parameter["sharedLinkId"]}}/assets',
-						body: {
-							assetIds: idListExpr('assetIds'),
-						},
 					},
 					output: {
 						postReceive: [assertBulkSuccess],
@@ -42,13 +39,15 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'POST',
 						url: '/shared-links',
+						// `linkType` is an options field (cannot carry an expression), and
+						// `albumId` is a resourceLocator the proxy extracts. `assetIds` is a
+						// comma-separated string the user can fill with an expression, so it is
+						// sent per-field via `routing.send` on the field definition.
+						// Booleans (`allowDownload`/`allowUpload`/`showMetadata`) are toggles.
 						body: {
 							type: '={{$parameter["linkType"]}}',
 							albumId: '={{$parameter["linkType"] === "ALBUM" ? $parameter["albumId"] : undefined}}',
 							assetIds: `={{$parameter["linkType"] === "INDIVIDUAL" ? ${idListJs('assetIds')} : undefined}}`,
-							description: optionalExpr('additionalFields.description'),
-							password: optionalExpr('additionalFields.password'),
-							expiresAt: dateTimeExpr('additionalFields.expiresAt'),
 							allowDownload: '={{$parameter["additionalFields"]["allowDownload"]}}',
 							allowUpload: '={{$parameter["additionalFields"]["allowUpload"]}}',
 							showMetadata: '={{$parameter["additionalFields"]["showMetadata"]}}',
@@ -86,9 +85,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'GET',
 						url: '/shared-links',
-						qs: {
-							albumId: optionalExpr('filters.albumId'),
-						},
 					},
 				},
 			},
@@ -100,9 +96,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'DELETE',
 						url: '=/shared-links/{{$parameter["sharedLinkId"]}}/assets',
-						body: {
-							assetIds: idListExpr('assetIds'),
-						},
 					},
 					output: {
 						postReceive: [assertBulkSuccess],
@@ -117,10 +110,8 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'PATCH',
 						url: '=/shared-links/{{$parameter["sharedLinkId"]}}',
+						// Booleans (`allowDownload`/`allowUpload`/`showMetadata`) are toggles.
 						body: {
-							description: clearableExpr('updateFields.description'),
-							password: clearableExpr('updateFields.password'),
-							expiresAt: dateTimeExpr('updateFields.expiresAt', { clearable: true }),
 							allowDownload: '={{$parameter["updateFields"]["allowDownload"]}}',
 							allowUpload: '={{$parameter["updateFields"]["allowUpload"]}}',
 							showMetadata: '={{$parameter["updateFields"]["showMetadata"]}}',
@@ -163,6 +154,9 @@ export const operations: INodeProperties[] = [
 		required: true,
 		description: 'Comma-separated list of asset IDs',
 		displayOptions: { show: { resource: ['sharedLink'], operation: ['create'], linkType: ['INDIVIDUAL'] } },
+		// Sent via the conditional `assetIds` body entry in the Create operation; this
+		// field has no `routing.send` because the value is consumed by the inline
+		// conditional expression that also gates on `linkType`.
 	},
 	{
 		displayName: 'Additional Fields',
@@ -174,9 +168,28 @@ export const operations: INodeProperties[] = [
 		options: [
 			{ displayName: 'Allow Download', name: 'allowDownload', type: 'boolean', default: true },
 			{ displayName: 'Allow Upload', name: 'allowUpload', type: 'boolean', default: false },
-			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
-			{ displayName: 'Expires At', name: 'expiresAt', type: 'dateTime', default: '' },
-			{ displayName: 'Password', name: 'password', type: 'string', typeOptions: { password: true }, default: '' },
+			{
+				displayName: 'Description',
+				name: 'description',
+				type: 'string',
+				default: '',
+				routing: optionalSend('body', 'description'),
+			},
+			{
+				displayName: 'Expires At',
+				name: 'expiresAt',
+				type: 'dateTime',
+				default: '',
+				routing: dateTimeSend('body', 'expiresAt'),
+			},
+			{
+				displayName: 'Password',
+				name: 'password',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+				routing: optionalSend('body', 'password'),
+			},
 			{ displayName: 'Show Metadata', name: 'showMetadata', type: 'boolean', default: true },
 		],
 	},
@@ -189,7 +202,15 @@ export const operations: INodeProperties[] = [
 		placeholder: 'Add Filter',
 		default: {},
 		displayOptions: { show: { resource: ['sharedLink'], operation: ['getAll'] } },
-		options: [{ displayName: 'Album ID', name: 'albumId', type: 'string', default: '' }],
+		options: [
+			{
+				displayName: 'Album ID',
+				name: 'albumId',
+				type: 'string',
+				default: '',
+				routing: optionalSend('query', 'albumId'),
+			},
+		],
 	},
 
 	// Get / Update / Delete / asset ops — Shared Link
@@ -223,6 +244,7 @@ export const operations: INodeProperties[] = [
 				type: 'string',
 				default: '',
 				description: 'Leave empty to remove the description',
+				routing: clearableSend('body', 'description'),
 			},
 			{
 				displayName: 'Expires At',
@@ -230,6 +252,7 @@ export const operations: INodeProperties[] = [
 				type: 'dateTime',
 				default: '',
 				description: 'Leave empty to make the link never expire',
+				routing: dateTimeSend('body', 'expiresAt', { clearable: true }),
 			},
 			{
 				displayName: 'Password',
@@ -238,6 +261,7 @@ export const operations: INodeProperties[] = [
 				typeOptions: { password: true },
 				default: '',
 				description: 'Leave empty to remove the password',
+				routing: clearableSend('body', 'password'),
 			},
 			{ displayName: 'Show Metadata', name: 'showMetadata', type: 'boolean', default: true },
 		],
@@ -252,5 +276,6 @@ export const operations: INodeProperties[] = [
 		required: true,
 		description: 'Comma-separated list of asset IDs',
 		displayOptions: { show: { resource: ['sharedLink'], operation: ['addAssets', 'removeAssets'] } },
+		routing: idListSend('body', 'assetIds'),
 	},
 ];
