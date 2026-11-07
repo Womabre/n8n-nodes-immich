@@ -39,6 +39,7 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 | Operation        | Description                                     |
 | ----------------- | ------------------------------------------------ |
 | Create            | Create a new album, optionally seeded with assets |
+| Create or Update  | Create a new album, or add assets to it if an album with that name already exists (upsert) |
 | Get               | Retrieve an album by ID                          |
 | Get Many          | List albums, filtered by shared/owned status, name or asset |
 | Update            | Update an album's name, description, thumbnail, or sort order |
@@ -53,7 +54,7 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 | Operation         | Description                                                                |
 | ------------------ | ---------------------------------------------------------------------------- |
-| Search Metadata    | Find assets by structured metadata filters (favorites, album, people, tags…); supports Return All |
+| Search Metadata    | Find assets by structured metadata filters (favorites, album, people, tags, original file name…); supports Return All |
 | Search Smart       | CLIP-powered natural-language / visual-similarity search; supports Return All |
 | Get Suggestions    | Get known values for a metadata facet (city, camera make, etc.)             |
 
@@ -68,14 +69,15 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 ### Tag
 
-| Operation     | Description                          |
-| ------------- | --------------------------------------- |
-| Create        | Create a tag                          |
-| Get Many      | List tags                             |
-| Get           | Retrieve a tag by ID                  |
-| Delete        | Delete a tag                          |
-| Tag Assets    | Apply a tag to one or more assets     |
-| Untag Assets  | Remove a tag from one or more assets  |
+| Operation        | Description                          |
+| ---------------- | --------------------------------------- |
+| Create           | Create a tag                          |
+| Create or Update | Create tags (if missing) and apply them to assets — multiple tags at once |
+| Get Many         | List tags                             |
+| Get              | Retrieve a tag by ID                  |
+| Delete           | Delete a tag                          |
+| Tag Assets       | Apply a tag to one or more assets     |
+| Untag Assets     | Remove a tag from one or more assets  |
 
 ### Shared Link
 

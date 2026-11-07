@@ -1,7 +1,7 @@
 import { INodeProperties } from 'n8n-workflow';
 import { resourceLocatorModes, returnAllAndLimit } from '../parameters/shared-parameters';
 import { assertBulkSuccess } from '../utils/bulk';
-import { dateExpr, idListExpr, optionalExpr } from '../utils/expressions';
+import { dateSend, idListSend, optionalSend } from '../utils/expressions';
 import { paginateByPage } from '../utils/pagination';
 
 export const operations: INodeProperties[] = [
@@ -25,6 +25,7 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'GET',
 						url: '/people',
+						// `withHidden` is a boolean toggle, safe to read inline.
 						qs: {
 							withHidden: '={{$parameter["filters"]["withHidden"]}}',
 						},
@@ -64,11 +65,10 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'PUT',
 						url: '=/people/{{$parameter["personId"]}}',
+						// `isFavorite`/`isHidden` are boolean toggles, safe inline.
 						body: {
-							name: optionalExpr('updateFields.name'),
 							isFavorite: '={{$parameter["updateFields"]["isFavorite"]}}',
 							isHidden: '={{$parameter["updateFields"]["isHidden"]}}',
-							birthDate: dateExpr('updateFields.birthDate'),
 						},
 					},
 				},
@@ -82,9 +82,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'POST',
 						url: '=/people/{{$parameter["personId"]}}/merge',
-						body: {
-							ids: idListExpr('mergeIds'),
-						},
 					},
 					output: {
 						postReceive: [assertBulkSuccess],
@@ -127,15 +124,32 @@ export const operations: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['person'], operation: ['update'] } },
 		options: [
-			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
-			{ displayName: 'Is Favorite', name: 'isFavorite', type: 'boolean', default: false },
-			{ displayName: 'Is Hidden', name: 'isHidden', type: 'boolean', default: false },
+			{
+				displayName: 'Name',
+				name: 'name',
+				type: 'string',
+				default: '',
+				routing: optionalSend('body', 'name'),
+			},
+			{
+				displayName: 'Is Favorite',
+				name: 'isFavorite',
+				type: 'boolean',
+				default: false,
+			},
+			{
+				displayName: 'Is Hidden',
+				name: 'isHidden',
+				type: 'boolean',
+				default: false,
+			},
 			{
 				displayName: 'Birth Date',
 				name: 'birthDate',
 				type: 'dateTime',
 				default: '',
 				description: 'Only the date is used. Leave empty to remove the birth date.',
+				routing: dateSend('body', 'birthDate'),
 			},
 		],
 	},
@@ -148,5 +162,6 @@ export const operations: INodeProperties[] = [
 		required: true,
 		description: 'Comma-separated list of duplicate person IDs to merge into Person ID',
 		displayOptions: { show: { resource: ['person'], operation: ['merge'] } },
+		routing: idListSend('body', 'ids'),
 	},
 ];

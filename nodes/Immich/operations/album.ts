@@ -1,7 +1,8 @@
 import { INodeProperties } from 'n8n-workflow';
 import { resourceLocatorModes } from '../parameters/shared-parameters';
 import { assertBulkSuccess } from '../utils/bulk';
-import { clearableExpr, idListExpr, optionalExpr } from '../utils/expressions';
+import { clearableSend, idListSend, optionalSend } from '../utils/expressions';
+import { resolveUpsertAlbum } from '../utils/upsert';
 
 export const operations: INodeProperties[] = [
 	{
@@ -23,9 +24,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'PUT',
 						url: '=/albums/{{$parameter["albumId"]}}/assets',
-						body: {
-							ids: idListExpr('assetIds'),
-						},
 					},
 					output: {
 						postReceive: [assertBulkSuccess],
@@ -55,11 +53,29 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'POST',
 						url: '/albums',
-						body: {
-							albumName: '={{$parameter["albumName"]}}',
-							description: optionalExpr('additionalFields.description'),
-							assetIds: idListExpr('additionalFields.assetIds'),
-						},
+					},
+				},
+			},
+			{
+				name: 'Create or Update',
+				value: 'upsert',
+				action: 'Create an album or add assets to it',
+				description: 'Create a new record, or update the current one if it already exists (upsert)',
+				routing: {
+					request: {
+						method: 'POST',
+						url: '/albums',
+					},
+					send: {
+						preSend: [resolveUpsertAlbum],
+					},
+					// `assertBulkSuccess` is harmless on the create branch: the POST /albums
+					// response is a single album object with no `success` field, so the filter
+					// passes everything through. On the add-assets branch (PUT) it turns
+					// failed IDs into a node error, with `duplicate` counting as success so
+					// re-runs stay idempotent.
+					output: {
+						postReceive: [assertBulkSuccess],
 					},
 				},
 			},
@@ -95,11 +111,14 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'GET',
 						url: '/albums',
+						// `isShared`/`isOwned` are boolean toggles the user can only set to
+						// true/false, so they cannot carry an expression and are safe to read
+						// back via `$parameter`. The string filters (`name`, `assetId`) are
+						// sent per-field via `routing.send` on the field definitions, which
+						// resolves user-entered expressions through `$value`.
 						qs: {
 							isShared: '={{$parameter["filters"]["isShared"]}}',
 							isOwned: '={{$parameter["filters"]["isOwned"]}}',
-							name: optionalExpr('filters.name'),
-							assetId: optionalExpr('filters.assetId'),
 						},
 					},
 				},
@@ -112,9 +131,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'DELETE',
 						url: '=/albums/{{$parameter["albumId"]}}/assets',
-						body: {
-							ids: idListExpr('assetIds'),
-						},
 					},
 					output: {
 						postReceive: [assertBulkSuccess],
@@ -141,13 +157,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'PATCH',
 						url: '=/albums/{{$parameter["albumId"]}}',
-						body: {
-							albumName: '={{$parameter["updateFields"]["albumName"] || undefined}}',
-							description: clearableExpr('updateFields.description'),
-							albumThumbnailAssetId: '={{$parameter["updateFields"]["albumThumbnailAssetId"] || undefined}}',
-							isActivityEnabled: '={{$parameter["updateFields"]["isActivityEnabled"]}}',
-							order: '={{$parameter["updateFields"]["order"] || undefined}}',
-						},
 					},
 				},
 			},
@@ -169,14 +178,18 @@ export const operations: INodeProperties[] = [
 		default: 'create',
 	},
 
-	// Create
+	// Create / Upsert
 	{
 		displayName: 'Album Name',
 		name: 'albumName',
 		type: 'string',
 		default: '',
 		required: true,
-		displayOptions: { show: { resource: ['album'], operation: ['create'] } },
+		displayOptions: { show: { resource: ['album'], operation: ['create', 'upsert'] } },
+		// For `create` this sends `albumName` in the body. For `upsert` the preSend
+		// hook rewrites the body entirely (and reads albumName via getNodeParameter),
+		// so this send is a no-op on that branch.
+		routing: optionalSend('body', 'albumName'),
 	},
 	{
 		displayName: 'Additional Fields',
@@ -186,16 +199,41 @@ export const operations: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['album'], operation: ['create'] } },
 		options: [
-			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
+			{
+				displayName: 'Description',
+				name: 'description',
+				type: 'string',
+				default: '',
+				routing: optionalSend('body', 'description'),
+			},
 			{
 				displayName: 'Asset IDs',
 				name: 'assetIds',
 				type: 'string',
 				default: '',
 				description: 'Comma-separated list of asset IDs to seed the album with',
+				routing: idListSend('body', 'assetIds'),
 			},
 		],
 	},
+
+	// Upsert — asset IDs (consumed by the preSend hook, not via routing.send,
+	// because the body shape differs between the create and add-assets branches)
+	{
+		displayName: 'Asset IDs',
+		name: 'assetIds',
+		type: 'string',
+		default: '',
+		required: true,
+		description: 'Comma-separated list of asset IDs to add to the album',
+		displayOptions: { show: { resource: ['album'], operation: ['upsert'] } },
+	},
+
+	// Add User — body is a single object `albumUsers: [{ userId, role }]` built
+	// from the `userId` resourceLocator and `role` options field. Both are
+	// non-free-text (locator picks an ID, role picks from options), so neither
+	// can carry a `{{ }}` expression; the inline `$parameter` body is safe.
+	// Update User Role — body is `{ role }`, role is options-only, inline safe.
 
 	// Get / Update / Delete / asset & user ops — Album
 	{
@@ -238,6 +276,7 @@ export const operations: INodeProperties[] = [
 				type: 'string',
 				default: '',
 				description: 'Only return albums containing this asset (Immich then ignores the other filters)',
+				routing: optionalSend('query', 'assetId'),
 			},
 			{
 				displayName: 'Is Owned',
@@ -259,6 +298,7 @@ export const operations: INodeProperties[] = [
 				type: 'string',
 				default: '',
 				description: 'Only return albums with exactly this name',
+				routing: optionalSend('query', 'name'),
 			},
 		],
 	},
@@ -272,8 +312,20 @@ export const operations: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['album'], operation: ['update'] } },
 		options: [
-			{ displayName: 'Album Name', name: 'albumName', type: 'string', default: '' },
-			{ displayName: 'Album Thumbnail Asset ID', name: 'albumThumbnailAssetId', type: 'string', default: '' },
+			{
+				displayName: 'Album Name',
+				name: 'albumName',
+				type: 'string',
+				default: '',
+				routing: optionalSend('body', 'albumName'),
+			},
+			{
+				displayName: 'Album Thumbnail Asset ID',
+				name: 'albumThumbnailAssetId',
+				type: 'string',
+				default: '',
+				routing: optionalSend('body', 'albumThumbnailAssetId'),
+			},
 			{
 				displayName: 'Asset Order',
 				name: 'order',
@@ -283,6 +335,7 @@ export const operations: INodeProperties[] = [
 					{ name: 'Descending', value: 'desc' },
 				],
 				default: 'desc',
+				routing: optionalSend('body', 'order'),
 			},
 			{
 				displayName: 'Description',
@@ -290,8 +343,15 @@ export const operations: INodeProperties[] = [
 				type: 'string',
 				default: '',
 				description: 'Leave empty to remove the description',
+				routing: clearableSend('body', 'description'),
 			},
-			{ displayName: 'Enable Activity Feed', name: 'isActivityEnabled', type: 'boolean', default: true },
+			{
+				displayName: 'Enable Activity Feed',
+				name: 'isActivityEnabled',
+				type: 'boolean',
+				default: true,
+				routing: optionalSend('body', 'isActivityEnabled'),
+			},
 		],
 	},
 
@@ -304,6 +364,7 @@ export const operations: INodeProperties[] = [
 		required: true,
 		description: 'Comma-separated list of asset IDs',
 		displayOptions: { show: { resource: ['album'], operation: ['addAssets', 'removeAssets'] } },
+		routing: idListSend('body', 'ids'),
 	},
 
 	// Add/Update User

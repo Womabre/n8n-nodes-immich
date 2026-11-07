@@ -1,12 +1,29 @@
 import { INodeProperties } from 'n8n-workflow';
 import { returnAllAndLimit } from '../parameters/shared-parameters';
-import { dateTimeExpr, idListExpr, optionalExpr } from '../utils/expressions';
+import { dateTimeSend, idListSend, optionalSend } from '../utils/expressions';
 import { paginateByPage } from '../utils/pagination';
 
 const sharedSearchFilterOptions: INodeProperties['options'] = [
-	{ displayName: 'Album IDs', name: 'albumIds', type: 'string', default: '', description: 'Comma-separated album IDs' },
-	{ displayName: 'Is Favorite', name: 'isFavorite', type: 'boolean', default: false },
-	{ displayName: 'Is Not In Album', name: 'isNotInAlbum', type: 'boolean', default: false },
+	{
+		displayName: 'Album IDs',
+		name: 'albumIds',
+		type: 'string',
+		default: '',
+		description: 'Comma-separated album IDs',
+		routing: idListSend('body', 'albumIds'),
+	},
+	{
+		displayName: 'Is Favorite',
+		name: 'isFavorite',
+		type: 'boolean',
+		default: false,
+	},
+	{
+		displayName: 'Is Not In Album',
+		name: 'isNotInAlbum',
+		type: 'boolean',
+		default: false,
+	},
 	{
 		displayName: 'Type',
 		name: 'type',
@@ -19,33 +36,60 @@ const sharedSearchFilterOptions: INodeProperties['options'] = [
 			{ name: 'Video', value: 'VIDEO' },
 		],
 		default: '',
+		routing: optionalSend('body', 'type'),
 	},
-	{ displayName: 'Person IDs', name: 'personIds', type: 'string', default: '', description: 'Comma-separated person IDs' },
-	{ displayName: 'Tag IDs', name: 'tagIds', type: 'string', default: '', description: 'Comma-separated tag IDs' },
-	{ displayName: 'City', name: 'city', type: 'string', default: '' },
-	{ displayName: 'Country', name: 'country', type: 'string', default: '' },
-	{ displayName: 'Make', name: 'make', type: 'string', default: '' },
-	{ displayName: 'Model', name: 'model', type: 'string', default: '' },
-	{ displayName: 'Taken After', name: 'takenAfter', type: 'dateTime', default: '' },
-	{ displayName: 'Taken Before', name: 'takenBefore', type: 'dateTime', default: '' },
+	{
+		displayName: 'Person IDs',
+		name: 'personIds',
+		type: 'string',
+		default: '',
+		description: 'Comma-separated person IDs',
+		routing: idListSend('body', 'personIds'),
+	},
+	{
+		displayName: 'Tag IDs',
+		name: 'tagIds',
+		type: 'string',
+		default: '',
+		description: 'Comma-separated tag IDs',
+		routing: idListSend('body', 'tagIds'),
+	},
+	{ displayName: 'City', name: 'city', type: 'string', default: '', routing: optionalSend('body', 'city') },
+	{ displayName: 'Country', name: 'country', type: 'string', default: '', routing: optionalSend('body', 'country') },
+	{ displayName: 'Make', name: 'make', type: 'string', default: '', routing: optionalSend('body', 'make') },
+	{ displayName: 'Model', name: 'model', type: 'string', default: '', routing: optionalSend('body', 'model') },
+	{
+		displayName: 'Taken After',
+		name: 'takenAfter',
+		type: 'dateTime',
+		default: '',
+		routing: dateTimeSend('body', 'takenAfter'),
+	},
+	{
+		displayName: 'Taken Before',
+		name: 'takenBefore',
+		type: 'dateTime',
+		default: '',
+		routing: dateTimeSend('body', 'takenBefore'),
+	},
 	{ displayName: 'Include EXIF', name: 'withExif', type: 'boolean', default: false },
 ];
 
-const sharedSearchBody = {
-	albumIds: idListExpr('filters.albumIds'),
-	personIds: idListExpr('filters.personIds'),
-	tagIds: idListExpr('filters.tagIds'),
-	isFavorite: '={{$parameter["filters"]["isFavorite"]}}',
-	isNotInAlbum: '={{$parameter["filters"]["isNotInAlbum"]}}',
-	type: optionalExpr('filters.type'),
-	city: optionalExpr('filters.city'),
-	country: optionalExpr('filters.country'),
-	make: optionalExpr('filters.make'),
-	model: optionalExpr('filters.model'),
-	takenAfter: dateTimeExpr('filters.takenAfter'),
-	takenBefore: dateTimeExpr('filters.takenBefore'),
-	withExif: '={{$parameter["filters"]["withExif"]}}',
-};
+// `originalFileName` exists on Immich's MetadataSearchDto but not on SmartSearchDto.
+// n8n forbids `displayOptions` on a `collection` child, so the only way to expose
+// this field to Search Metadata alone is a separate options array + a second
+// `Filters` collection definition gated to the Metadata operation.
+const metadataSearchFilterOptions: INodeProperties['options'] = [
+	...sharedSearchFilterOptions,
+	{
+		displayName: 'Original File Name',
+		name: 'originalFileName',
+		type: 'string',
+		default: '',
+		description: 'Filter by the original file name (e.g. IMG_1234.jpg)',
+		routing: optionalSend('body', 'originalFileName'),
+	},
+];
 
 export const operations: INodeProperties[] = [
 	{
@@ -68,7 +112,14 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'POST',
 						url: '/search/metadata',
-						body: sharedSearchBody,
+						// Booleans (`isFavorite`, `isNotInAlbum`, `withExif`) are toggles that
+						// cannot carry an expression, so they stay inline. Every string/date/id-list
+						// filter is sent per-field via `routing.send` on the filter definitions.
+						body: {
+							isFavorite: '={{$parameter["filters"]["isFavorite"]}}',
+							isNotInAlbum: '={{$parameter["filters"]["isNotInAlbum"]}}',
+							withExif: '={{$parameter["filters"]["withExif"]}}',
+						},
 					},
 					operations: {
 						pagination: paginateByPage('body'),
@@ -95,8 +146,9 @@ export const operations: INodeProperties[] = [
 						method: 'POST',
 						url: '/search/smart',
 						body: {
-							query: '={{$parameter["query"]}}',
-							...sharedSearchBody,
+							isFavorite: '={{$parameter["filters"]["isFavorite"]}}',
+							isNotInAlbum: '={{$parameter["filters"]["isNotInAlbum"]}}',
+							withExif: '={{$parameter["filters"]["withExif"]}}',
 						},
 					},
 					operations: {
@@ -142,18 +194,30 @@ export const operations: INodeProperties[] = [
 		required: true,
 		description: 'Natural language description of what to find, e.g. "a dog on a beach"',
 		displayOptions: { show: { resource: ['search'], operation: ['searchSmart'] } },
+		routing: optionalSend('body', 'query'),
 	},
 
-	// Search Metadata + Smart shared filters
+	// Search Metadata + Smart shared pagination/limit
 	...returnAllAndLimit('search', ['searchMetadata', 'searchSmart'], 'body'),
+	// Filters for Search Smart — shared filters only (no `originalFileName`).
 	{
 		displayName: 'Filters',
 		name: 'filters',
 		type: 'collection',
 		placeholder: 'Add Filter',
 		default: {},
-		displayOptions: { show: { resource: ['search'], operation: ['searchMetadata', 'searchSmart'] } },
+		displayOptions: { show: { resource: ['search'], operation: ['searchSmart'] } },
 		options: sharedSearchFilterOptions,
+	},
+	// Filters for Search Metadata — shared filters plus Original File Name.
+	{
+		displayName: 'Filters',
+		name: 'filters',
+		type: 'collection',
+		placeholder: 'Add Filter',
+		default: {},
+		displayOptions: { show: { resource: ['search'], operation: ['searchMetadata'] } },
+		options: metadataSearchFilterOptions,
 	},
 
 	// Get Suggestions

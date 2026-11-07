@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import { DateTime } from 'luxon';
 import { IDataObject, IExecuteSingleFunctions, IHttpRequestOptions, INodeProperties } from 'n8n-workflow';
 import { processBinaryResponse } from '../utils/binary';
-import { dateTimeExpr, idListExpr, optionalExpr } from '../utils/expressions';
+import { dateTimeSend, idListSend, optionalSend } from '../utils/expressions';
 
 interface MultipartField {
 	key: string;
@@ -165,16 +165,11 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'PUT',
 						url: '=/assets/{{$parameter["assetId"]}}',
+						// `isFavorite` is a boolean toggle that cannot carry an expression,
+						// so it is safe to read back via `$parameter`. String/date/number
+						// fields are sent per-field via `routing.send` on their definitions.
 						body: {
-							// An added-but-empty description clears it ("" is how Immich stores no description).
-							description: '={{$parameter["updateFields"]["description"]}}',
 							isFavorite: '={{$parameter["updateFields"]["isFavorite"]}}',
-							rating:
-								'={{$parameter["updateFields"]["rating"] === undefined ? undefined : $parameter["updateFields"]["rating"] === "unrated" ? null : Number($parameter["updateFields"]["rating"])}}',
-							visibility: optionalExpr('updateFields.visibility'),
-							dateTimeOriginal: dateTimeExpr('updateFields.dateTimeOriginal'),
-							latitude: '={{$parameter["updateFields"]["latitude"]}}',
-							longitude: '={{$parameter["updateFields"]["longitude"]}}',
 						},
 					},
 				},
@@ -188,8 +183,8 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'DELETE',
 						url: '/assets',
+						// `force` is a boolean toggle, safe to read inline.
 						body: {
-							ids: idListExpr('assetIds'),
 							force: '={{$parameter["force"]}}',
 						},
 					},
@@ -221,9 +216,6 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'GET',
 						url: '=/assets/{{$parameter["assetId"]}}/thumbnail',
-						qs: {
-							size: '={{$parameter["size"]}}',
-						},
 						returnFullResponse: true,
 						encoding: 'arraybuffer',
 					},
@@ -241,10 +233,10 @@ export const operations: INodeProperties[] = [
 					request: {
 						method: 'GET',
 						url: '/assets/statistics',
+						// `isFavorite`/`isTrashed` are boolean toggles, safe inline.
 						qs: {
 							isFavorite: '={{$parameter["filters"]["isFavorite"]}}',
 							isTrashed: '={{$parameter["filters"]["isTrashed"]}}',
-							visibility: optionalExpr('filters.visibility'),
 						},
 					},
 				},
@@ -319,11 +311,42 @@ export const operations: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['asset'], operation: ['update'] } },
 		options: [
-			{ displayName: 'Date Time Original', name: 'dateTimeOriginal', type: 'dateTime', default: '' },
-			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
-			{ displayName: 'Is Favorite', name: 'isFavorite', type: 'boolean', default: false },
-			{ displayName: 'Latitude', name: 'latitude', type: 'number', default: 0 },
-			{ displayName: 'Longitude', name: 'longitude', type: 'number', default: 0 },
+			{
+				displayName: 'Date Time Original',
+				name: 'dateTimeOriginal',
+				type: 'dateTime',
+				default: '',
+				routing: dateTimeSend('body', 'dateTimeOriginal'),
+			},
+			{
+				displayName: 'Description',
+				name: 'description',
+				type: 'string',
+				default: '',
+				// An added-but-empty description clears it ("" is how Immich stores no description).
+				routing: { send: { type: 'body', property: 'description', value: '={{ $value }}' } },
+			},
+			{
+				displayName: 'Is Favorite',
+				name: 'isFavorite',
+				type: 'boolean',
+				default: false,
+				// already sent inline via $parameter (boolean toggle, expression-safe).
+			},
+			{
+				displayName: 'Latitude',
+				name: 'latitude',
+				type: 'number',
+				default: 0,
+				routing: optionalSend('body', 'latitude'),
+			},
+			{
+				displayName: 'Longitude',
+				name: 'longitude',
+				type: 'number',
+				default: 0,
+				routing: optionalSend('body', 'longitude'),
+			},
 			{
 				displayName: 'Rating',
 				name: 'rating',
@@ -339,6 +362,13 @@ export const operations: INodeProperties[] = [
 				],
 				default: 1,
 				description: 'Star rating, Rejected, or Unrated to clear the rating',
+				routing: {
+					send: {
+						type: 'body',
+						property: 'rating',
+						value: '={{ $value === undefined ? undefined : $value === "unrated" ? null : Number($value) }}',
+					},
+				},
 			},
 			{
 				displayName: 'Visibility',
@@ -346,6 +376,7 @@ export const operations: INodeProperties[] = [
 				type: 'options',
 				options: visibilityOptions,
 				default: 'timeline',
+				routing: optionalSend('body', 'visibility'),
 			},
 		],
 	},
@@ -359,6 +390,7 @@ export const operations: INodeProperties[] = [
 		required: true,
 		description: 'Comma-separated list of asset IDs to delete',
 		displayOptions: { show: { resource: ['asset'], operation: ['delete'] } },
+		routing: idListSend('body', 'ids'),
 	},
 	{
 		displayName: 'Force',
@@ -380,6 +412,7 @@ export const operations: INodeProperties[] = [
 		],
 		default: 'thumbnail',
 		displayOptions: { show: { resource: ['asset'], operation: ['view'] } },
+		routing: optionalSend('query', 'size'),
 	},
 
 	// Get Statistics
@@ -412,6 +445,7 @@ export const operations: INodeProperties[] = [
 				type: 'options',
 				options: visibilityOptions,
 				default: 'timeline',
+				routing: optionalSend('query', 'visibility'),
 			},
 		],
 	},
